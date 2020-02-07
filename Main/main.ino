@@ -3,117 +3,124 @@
 //#include <DriveBase.h>
 //#include <Intake.h>
 #include <Servo.h>
-#define baudrate 9600   // the baudrate for comms, has to match the baudrate of the driverstation
-#define time_out 500    // the number of milliseconds to wait after recieving signal before calling failsafe
-#define SPEED 0.75 // 1 - 5
+#define BAUDRATE 9600   // the BAUDRATE for comms, has to match the BAUDRATE of the driverstation
+#define TIME_OUT 500    // the number of milliseconds to wait after recieving signal before calling FailSafe
+#define SPEED 0.75      // 1 - 5
+#define MOTOR_OFF 1500   // experimental off value for motors
 
 byte feedback[10];
 byte controller[8];
 byte data[8];
 
 // pin macros, make sure to set these
-#define frontLeftPWM 2
-#define frontRightPWM 3
-#define rearLeftPWM 4
-#define rearRightPWM 5
+#define FRONT_LEFT_PWM 2
+#define FRONT_RIGHT_PWM 3
+#define REAR_LEFT_PWM 4
+#define REAR_RIGHT_PWM 5
 
-#define intakePWM 6
+#define INTAKE_PWM 6
 
-#define shooterPWM1 7
-#define shooterPWM2 8
+#define SHOOTER_PWM1 7
+#define SHOOTER_PWM2 8
 
-#define linXPin 14
-#define linYPin 15
-#define linBPin 16
-#define linAPin 17
+#define LIN_X_PIN 14
+#define LIN_Y_PIN 15
+#define LIN_B_PIN 16
+#define LIN_A_PIN 17
+
+// controller macros
+#define 
+
+// wireless communication constants
+#define STARTING_PACKET_IDX 0
 
 // wireless communication variables
-boolean connection;
-boolean badPacket;
+boolean is_connected;
+boolean bad_packet;
 byte x;
 byte packet_index;
 byte i;
 byte size1;
-byte checkSumTX;    // check sum for transmitting data
-byte checkSumRX;    // check sum for recieving data
-bool firstTime = true;
+byte check_sum_tx;    // check sum for transmitting data
+byte check_sum_rx;    // check sum for recieving data
+bool first_time = true;
 unsigned long read_time;
 
 // drive motors
-Servo driveFrontLeft; // front left wheel
-Servo driveFrontRight; // front right wheel
-Servo driveRearLeft; // rear left wheel
-Servo driveRearRight; // rear right wheel
+Servo drive_front_left; // front left wheel
+Servo drive_front_right; // front right wheel
+Servo drive_rear_left; // rear left wheel
+Servo drive_rear_right; // rear right wheel
 
 // shooter motors
-Servo shooterLeft;
-Servo shooterRight;
+Servo shooter_left;
+Servo shooter_right;
 
 // intake motor
 Servo intake;
 
 // drive variables
-int leftThrottle = 1500; // throttle for left side
-int rightThrottle = 1500; // throttle for right side
+int left_throttle = 1500; // throttle for left side
+int right_throttle = 1500; // throttle for right side
 
 // intake variable
-bool intakeTrigger = false;
+bool is_intake_trigger = false;
 
 // shooter variable
-bool shooterTrigger = false;
+bool is_shooter_trigger = false;
 
 // linear actuator variables
-bool linX = false; // actuator bound to X
-bool linY = false; // actuator bound to Y
-bool linB = false; // actuator bound to B
-bool linA = false; // actuator bound to A
+bool is_lin_x = false; // actuator bound to X
+bool is_lin_y = false; // actuator bound to Y
+bool is_lin_b = false; // actuator bound to B
+bool is_lin_a = false; // actuator bound to A
 
-void failsafe(){
+void FailSafe(){
     // write the code below that you want to run
     // when the robot loses a signal here
-    firstTime = false;
-    driveFailsafe();
-    intakeFailsafe();
-    linearActuatorFailsafe();
-    connection = false;
+    first_time = false;
+    DriveFailSafe();
+    IntakeFailSafe();
+    LinearActuatorFailSafe();
+    is_connected = false;
 }
 
-void driveFailsafe() {
-    driveFrontLeft.writeMicroseconds(1500);
-    driveRearLeft.writeMicroseconds(1500);
-    driveFrontRight.writeMicroseconds(1500);
-    driveRearRight.writeMicroseconds(1500);
+void DriveFailSafe() {
+    drive_front_left.writeMicroseconds(MOTOR_OFF);
+    drive_rear_left.writeMicroseconds(MOTOR_OFF);
+    drive_front_right.writeMicroseconds(MOTOR_OFF);
+    drive_rear_right.writeMicroseconds(MOTOR_OFF);
 }
 
-void linearActuatorFailsafe() {
-    digitalWrite(linAPin, LOW);
-    digitalWrite(linBPin, LOW);
-    digitalWrite(linXPin, LOW);
-    digitalWrite(linYPin, LOW);
+void LinearActuatorFailSafe() {
+    digitalWrite(LIN_A_PIN, LOW);
+    digitalWrite(LIN_B_PIN, LOW);
+    digitalWrite(LIN_X_PIN, LOW);
+    digitalWrite(LIN_Y_PIN, LOW);
 }
 
-void intakeFailsafe() {
+void IntakeFailSafe() {
     intake.write(90);
 }
 
 void setup(){
     //declare the Serial1 port for comms
-    //the paramater of the begin function is the baudrate
-    Serial.begin(9600);
-    Serial1.begin(9600);
+    //the paramater of the begin function is the BAUDRATE
+    Serial.begin(BAUDRATE);
+    Serial1.begin(BAUDRATE);
     // initialize the variables to 0
     memset(controller,0,sizeof(controller));
     memset(feedback,0,sizeof(feedback));
-    connection = true;
+    is_connected = true;
 
     //subsystem initialization
-    initDrive(frontLeftPWM, rearLeftPWM, frontRightPWM, rearRightPWM);
-    initShooter(shooterPWM1, shooterPWM2);
-    initIntake(intakePWM);
-    initLinearActuators(linAPin, linBPin, linXPin, linYPin);
-    failsafe();
+    InitDrive(FRONT_LEFT_PWM, REAR_LEFT_PWM, FRONT_RIGHT_PWM, REAR_RIGHT_PWM);
+    InitShooter(SHOOTER_PWM1, SHOOTER_PWM2);
+    InitIntake(INTAKE_PWM);
+    InitLinearActuators(LIN_A_PIN, LIN_B_PIN, is_lin_x_PIN, LIN_Y_PIN);
+    FailSafe();
     read_time = millis();
-    checkSumRX = 0;
+    check_sum_rx = 0;
     x = 0;
     packet_index = 0;
 }
@@ -121,146 +128,143 @@ void setup(){
 void loop(){
     // this while block of code might not need the "packet_index == 0" condition
     // it causes the robot to be more tolerant of old data which can be bad
-    // you might want to deleting that condition
-    connection = false;
-    while(packet_index == 0 && Serial1.available() >= 22){
+    // you might want to delete that condition
+    is_connected = false;
+    while (packet_index == 0 && Serial1.available() >= 22) {
         Serial1.read();
     }
 
     size1 = Serial1.available();
-    while(size1 > 0){
-        if(packet_index == 0){
-            if(Serial1.read()==255){
-    //              Serial.println("Valid lead");
+    while (size1 > 0) {
+        if (packet_index == STARTING_PACKET_IDX) {
+            if (Serial1.read() == 255) {
+    //          Serial.println("Valid lead");
                 packet_index++;
             }
-      //            else Serial.println("Invalid lead");
+      //    else Serial.println("Invalid lead");
         }
-        else if(packet_index < 9){
+        else if (packet_index < 9) {
             data[packet_index-1] = Serial1.read();
-            checkSumRX += data[packet_index-1];
+            check_sum_rx += data[packet_index-1];
             packet_index++;
         }
-        else if(packet_index == 9){
-            if(Serial1.read() == checkSumRX){
+        else if (packet_index == 9) {
+            if (Serial1.read() == check_sum_rx) {
                 packet_index++;
-            }else{
-                packet_index=0;
+            } else {
+                packet_index = 0;
             }
-            checkSumRX = 0;
+            check_sum_rx = 0;
         }
-        else if(packet_index == 10){
-            if(Serial1.read() == 240){
-    //              Serial.println("Valid end packet");
-                for(i=0; i<8; i++){
+        else if (packet_index == 10) {
+            if (Serial1.read() == 240) {
+    //          Serial.println("Valid end packet");
+                for (i = 0; i < 8; i++) {
                     controller[i] = data[i];
                 }
-                connection = true;
-    read_time = millis();
-    firstTime = true;
-    mainCode();
+                is_connected = true;
+                read_time = millis();
+                first_time = true;
+                MainCode();
             }
-      //            else Serial.println("Invalid end packet");
-            packet_index=0;
+      //    else Serial.println("Invalid end packet");
+            packet_index = 0;
         }
         size1--;
     }
-    if((firstTime && millis() - read_time >= time_out)){
-        failsafe();
+    if((first_time && millis() - read_time >= TIME_OUT)){
+        FailSafe();
     }
 }
 
 // main code executed upon successful I/O
-void mainCode() {
-    updateDrive(controller[3], controller[5]);
-    //updateShooter(B1 == ((controller[0] & B100000) >> 5)); // right bumper, set via janky bitwise stuff
-    updateIntake(B1 == ((controller[0] & B10000) >> 4), B1 == ((controller[0] & B100000) >> 5)); // left bumper, through similar jank
-    updateLinearActuators(B1 == ((controller[0] & B1)),
+void MainCode() {
+    UpdateDrive(controller[3], controller[5]);
+    //UpdateShooter(B1 == ((controller[0] & B100000) >> 5)); // right bumper, set via janky bitwise stuff
+    UpdateIntake(B1 == ((controller[0] & B10000) >> 4), B1 == ((controller[0] & B100000) >> 5)); // left bumper, through similar jank
+    UpdateLinearActuators(B1 == ((controller[0] & B1)),
         B1 == ((controller[0] & B10) >> 1),
         B1 == ((controller[0] & B100) >> 2),
         B1 == ((controller[0] & B1000) >> 3));
 }
 
 // updates state of drive motors
-void updateDrive(byte leftY, byte rightY) {
+void UpdateDrive(byte left_y, byte rightY) {
     // this might not work
-    int leftProp = (int)leftY;
-    int rightProp = (int)rightY;
+    int left_prop = (int)left_y;
+    int right_prop = (int)right_y;
 
-    int rightPropInverted = (int)rightY;
-    int leftPropInverted = (int)leftY;
+    int right_prop_inverted = (int)right_y;
+    int left_prop_inverted = (int)left_y;
 
-    leftProp = map(leftProp, 0, 200, 1500 - 100*SPEED, 1500 + 100*SPEED);
-    rightProp = map(rightProp, 0, 200, 1500 - 100*SPEED, 1500 + 100*SPEED);
+    left_prop = map(left_prop, 0, 200, 1500 - 100*SPEED, 1500 + 100*SPEED);
+    right_prop = map(right_prop, 0, 200, 1500 - 100*SPEED, 1500 + 100*SPEED);
 
-    leftPropInverted = map(leftPropInverted, 0, 200, 1500 + 100*SPEED, 1500 - 100*SPEED);
-    rightPropInverted = map(rightPropInverted, 0, 200, 1500 + 100*SPEED, 1500 - 100*SPEED);
+    left_prop_inverted = map(left_prop_inverted, 0, 200, 1500 + 100*SPEED, 1500 - 100*SPEED);
+    right_prop_inverted = map(right_prop_inverted, 0, 200, 1500 + 100*SPEED, 1500 - 100*SPEED);
 
-
-   // Serial.println(leftProp);
-
-    driveFrontLeft.writeMicroseconds(leftPropInverted);
-    driveRearLeft.writeMicroseconds(leftProp);
-    driveFrontRight.writeMicroseconds(rightPropInverted);
-    driveRearRight.writeMicroseconds(rightProp);
+    drive_front_left.writeMicroseconds(left_prop_inverted);
+    drive_rear_left.writeMicroseconds(left_prop);
+    drive_front_right.writeMicroseconds(right_prop_inverted);
+    drive_rear_right.writeMicroseconds(right_prop);
 }
 
 // drive init function
-void initDrive(int leftPWM1, int leftPWM2, int rightPWM1, int rightPWM2) {
-    driveFrontLeft.attach(leftPWM1);
-    driveRearLeft.attach(leftPWM2);
-    driveFrontRight.attach(rightPWM1);
-    driveRearRight.attach(rightPWM2);
+void InitDrive(int left_PWM1, int left_PWM2, int right_PWM1, int right_PWM2) {
+    drive_front_left.attach(left_PWM1);
+    drive_rear_left.attach(left_PWM2);
+    drive_front_right.attach(right_PWM1);
+    drive_rear_right.attach(right_PWM2);
 
-    driveFrontLeft.writeMicroseconds(1500);
-    driveRearLeft.writeMicroseconds(1500);
-    driveFrontRight.writeMicroseconds(1500);
-    driveRearRight.writeMicroseconds(1500);
+    drive_front_left.writeMicroseconds(MOTOR_OFF);
+    drive_rear_left.writeMicroseconds(MOTOR_OFF);
+    drive_front_right.writeMicroseconds(MOTOR_OFF);
+    drive_rear_right.writeMicroseconds(MOTOR_OFF);
     
     delay(2000);
 }
 
 // updates state of shooter motors
-void updateShooter(bool rightBumper) {
-    intake.writeMicroseconds(rightBumper ? 2000 : 1500);
+void UpdateShooter(bool is_right_bumper) {
+    intake.writeMicroseconds(is_right_bumper ? 2000 : MOTOR_OFF);
 }
 
 // shooter init function
-void initShooter(int leftPWM, int rightPWM) {
-    shooterLeft.attach(leftPWM);
-    shooterRight.attach(rightPWM);
+void InitShooter(int left_PWM, int right_PWM) {
+    shooter_left.attach(left_PWM);
+    shooter_right.attach(right_PWM);
 }
 
 // updates state of intake motors
-void updateIntake(bool leftBumper, bool rightBumper) {
-  if (leftBumper ^ rightBumper) {
-    if (leftBumper) {
+void UpdateIntake(bool is_left_bumper, bool is_right_bumper) {
+  if (is_left_bumper ^ is_right_bumper) {
+    if (is_left_bumper) {
       intake.writeMicroseconds(1000);
     }
-    else if(rightBumper) {
+    else if(is_right_bumper) {
       intake.writeMicroseconds(2000);
     }
   }
   else {
-    intake.writeMicroseconds(1500);
+    intake.writeMicroseconds(MOTOR_OFF);
   }
 }
 
 // intake init function
-void initIntake(int PWM) {
+void InitIntake(int PWM) {
     intake.attach(PWM);
 }
 
 // updates state of linear actuators
-void updateLinearActuators(bool A, bool B, bool X, bool Y) {
-    digitalWrite(linAPin, A ? HIGH : LOW);
-    digitalWrite(linBPin, B ? HIGH : LOW);
-    digitalWrite(linXPin, X ? HIGH : LOW);
-    digitalWrite(linYPin, Y ? HIGH : LOW);
+void UpdateLinearActuators(bool A, bool B, bool X, bool Y) {
+    digitalWrite(LIN_A_PIN, A ? HIGH : LOW);
+    digitalWrite(LIN_B_PIN, B ? HIGH : LOW);
+    digitalWrite(is_lin_x_PIN, X ? HIGH : LOW);
+    digitalWrite(LIN_Y_PIN, Y ? HIGH : LOW);
 }
 
 // linear actuator init function
-void initLinearActuators(int A, int B, int X, int Y) {
+void InitLinearActuators(int A, int B, int X, int Y) {
     pinMode(A, OUTPUT);
     pinMode(B, OUTPUT);
     pinMode(X, OUTPUT);
