@@ -3,20 +3,20 @@
 //#include <DriveBase.h>
 //#include <Intake.h>
 #include <Servo.h>
-#define BAUDRATE 9600   // the BAUDRATE for comms, has to match the BAUDRATE of the driverstation
-#define TIME_OUT 500    // the number of milliseconds to wait after recieving signal before calling FailSafe
-#define SPEED 0.75      // 1 - 5
-#define MOTOR_OFF 1500   // experimental off value for motors
+#define BAUDRATE    9600   // the BAUDRATE for comms, has to match the BAUDRATE of the driverstation
+#define TIME_OUT    500    // the number of milliseconds to wait after recieving signal before calling FailSafe
+#define SPEED       0.75   // [1 - 5]
+#define MOTOR_OFF   1500   // experimental off value for motors
 
 byte feedback[10];
 byte controller[8];
 byte data[8];
 
 // pin macros, make sure to set these
-#define FRONT_LEFT_PWM 2
+#define FRONT_LEFT_PWM  2
 #define FRONT_RIGHT_PWM 3
-#define REAR_LEFT_PWM 4
-#define REAR_RIGHT_PWM 5
+#define REAR_LEFT_PWM   4
+#define REAR_RIGHT_PWM  5
 
 #define INTAKE_PWM 6
 
@@ -29,7 +29,26 @@ byte data[8];
 #define LIN_A_PIN 17
 
 // controller macros
-#define 
+#define START       (controller[0] >> 6) & 1
+#define RB          (controller[0] >> 5) & 1
+#define LB          (controller[0] >> 4) & 1
+#define Y           (controller[0] >> 3) & 1
+#define X           (controller[0] >> 2) & 1
+#define B           (controller[0] >> 1) & 1
+#define A           controller[0] & 1
+#define SELECT      (controller[1] >> 6) & 1
+#define R3          (controller[1] >> 5) & 1
+#define L3          (controller[1] >> 4) & 1
+#define D_RIGHT     (controller[1] >> 3) & 1
+#define D_LEFT      (controller[1] >> 2) & 1
+#define D_DOWN      (controller[1] >> 1) & 1
+#define D_UP        controller[1] & 1
+#define L_STICK_X   controller[2]
+#define L_STICK_Y   controller[3]
+#define R_STICK_X   controller[4]
+#define R_STICK_Y   controller[5]
+#define L_TRIGGER   controller[6]
+#define R_TRIGGER   controller[7]
 
 // wireless communication constants
 #define STARTING_PACKET_IDX 0
