@@ -10,7 +10,9 @@
 
 byte feedback[10];
 byte controller[8];
-byte data[8];
+byte data[10];
+byte requested_state;
+byte IR_broadcast;
 
 // pin macros, make sure to set these
 #define FRONT_LEFT_PWM  2
@@ -29,29 +31,34 @@ byte data[8];
 #define LIN_A_PIN 17
 
 // controller macros
-#define START       (controller[0] >> 6) & 1
-#define RB          (controller[0] >> 5) & 1
-#define LB          (controller[0] >> 4) & 1
-#define Y           (controller[0] >> 3) & 1
-#define X           (controller[0] >> 2) & 1
-#define B           (controller[0] >> 1) & 1
-#define A           controller[0] & 1
-#define SELECT      (controller[1] >> 6) & 1
-#define R3          (controller[1] >> 5) & 1
-#define L3          (controller[1] >> 4) & 1
-#define D_RIGHT     (controller[1] >> 3) & 1
-#define D_LEFT      (controller[1] >> 2) & 1
-#define D_DOWN      (controller[1] >> 1) & 1
-#define D_UP        controller[1] & 1
-#define L_STICK_X   controller[2]
-#define L_STICK_Y   controller[3]
-#define R_STICK_X   controller[4]
-#define R_STICK_Y   controller[5]
-#define L_TRIGGER   controller[6]
-#define R_TRIGGER   controller[7]
+#define CNTLR_START         (controller[0] >> 6) & 1
+#define CNTLR_RB            (controller[0] >> 5) & 1
+#define CNTLR_LB            (controller[0] >> 4) & 1
+#define CNTLR_Y             (controller[0] >> 3) & 1
+#define CNTLR_X             (controller[0] >> 2) & 1
+#define CNTLR_B             (controller[0] >> 1) & 1
+#define CNTLR_A             (controller[0]) & 1
+#define CNTLR_SELECT        (controller[1] >> 6) & 1
+#define CNTLR_R3            (controller[1] >> 5) & 1
+#define CNTLR_L3            (controller[1] >> 4) & 1
+#define CNTLR_D_RIGHT       (controller[1] >> 3) & 1
+#define CNTLR_D_LEFT        (controller[1] >> 2) & 1
+#define CNTLR_D_DOWN        (controller[1] >> 1) & 1
+#define CNTLR_D_UP          (controller[1]) & 1
+#define CNTLR_L_STICK_X     controller[2]
+#define CNTLR_L_STICK_Y     controller[3]
+#define CNTLR_R_STICK_X     controller[4]
+#define CNTLR_R_STICK_Y     controller[5]
+#define CNTLR_L_TRIGGER     controller[6]
+#define CNTLR_R_TRIGGER     controller[7]
+
+// IR and state
+#define IR_ENABLE   (controller[0] >> 7) & 1
+#define STATE_RESET (controller[1] >> 7) & 1
 
 // wireless communication constants
 #define STARTING_PACKET_IDX 0
+#define CHECKSUM_IDX        11
 
 // wireless communication variables
 boolean is_connected;
@@ -71,30 +78,11 @@ Servo drive_front_right; // front right wheel
 Servo drive_rear_left; // rear left wheel
 Servo drive_rear_right; // rear right wheel
 
-// shooter motors
-Servo shooter_left;
-Servo shooter_right;
-
-// intake motor
-Servo intake;
-
 // drive variables
 int left_throttle = 1500; // throttle for left side
 int right_throttle = 1500; // throttle for right side
 
-// intake variable
-bool is_intake_trigger = false;
-
-// shooter variable
-bool is_shooter_trigger = false;
-
-// linear actuator variables
-bool is_lin_x = false; // actuator bound to X
-bool is_lin_y = false; // actuator bound to Y
-bool is_lin_b = false; // actuator bound to B
-bool is_lin_a = false; // actuator bound to A
-
-void FailSafe(){
+void FailSafe() {
     // write the code below that you want to run
     // when the robot loses a signal here
     first_time = false;
@@ -122,7 +110,7 @@ void IntakeFailSafe() {
     intake.write(90);
 }
 
-void setup(){
+void setup() {
     //declare the Serial1 port for comms
     //the paramater of the begin function is the BAUDRATE
     Serial.begin(BAUDRATE);
@@ -134,9 +122,6 @@ void setup(){
 
     //subsystem initialization
     InitDrive(FRONT_LEFT_PWM, REAR_LEFT_PWM, FRONT_RIGHT_PWM, REAR_RIGHT_PWM);
-    InitShooter(SHOOTER_PWM1, SHOOTER_PWM2);
-    InitIntake(INTAKE_PWM);
-    InitLinearActuators(LIN_A_PIN, LIN_B_PIN, is_lin_x_PIN, LIN_Y_PIN);
     FailSafe();
     read_time = millis();
     check_sum_rx = 0;
@@ -144,7 +129,7 @@ void setup(){
     packet_index = 0;
 }
 
-void loop(){
+void loop() {
     // this while block of code might not need the "packet_index == 0" condition
     // it causes the robot to be more tolerant of old data which can be bad
     // you might want to delete that condition
@@ -157,17 +142,17 @@ void loop(){
     while (size1 > 0) {
         if (packet_index == STARTING_PACKET_IDX) {
             if (Serial1.read() == 255) {
-    //          Serial.println("Valid lead");
-                packet_index++;
+              packet_index++;
+            } else {
+                Serial.println("Invalid lead");
             }
-      //    else Serial.println("Invalid lead");
         }
-        else if (packet_index < 9) {
+        else if (packet_index < CHECKSUM_IDX) {
             data[packet_index-1] = Serial1.read();
             check_sum_rx += data[packet_index-1];
             packet_index++;
         }
-        else if (packet_index == 9) {
+        else if (packet_index == CHECKSUM_IDX) {
             if (Serial1.read() == check_sum_rx) {
                 packet_index++;
             } else {
@@ -175,14 +160,15 @@ void loop(){
             }
             check_sum_rx = 0;
         }
-        else if (packet_index == 10) {
+        else if (packet_index == CHECKSUM_IDX + 1) {
             if (Serial1.read() == 240) {
-    //          Serial.println("Valid end packet");
                 for (i = 0; i < 8; i++) {
                     controller[i] = data[i];
                 }
-                is_connected = true;
+                requested_state = data[8];
+                IR_broadcast = data[9];                
                 read_time = millis();
+                is_connected = true;
                 first_time = true;
                 MainCode();
             }
@@ -191,7 +177,7 @@ void loop(){
         }
         size1--;
     }
-    if((first_time && millis() - read_time >= TIME_OUT)){
+    if (first_time && (millis() - read_time >= TIME_OUT)) {
         FailSafe();
     }
 }
@@ -208,7 +194,7 @@ void MainCode() {
 }
 
 // updates state of drive motors
-void UpdateDrive(byte left_y, byte rightY) {
+void UpdateDrive(byte left_y, byte right_y) {
     // this might not work
     int left_prop = (int)left_y;
     int right_prop = (int)right_y;
@@ -241,51 +227,4 @@ void InitDrive(int left_PWM1, int left_PWM2, int right_PWM1, int right_PWM2) {
     drive_rear_right.writeMicroseconds(MOTOR_OFF);
     
     delay(2000);
-}
-
-// updates state of shooter motors
-void UpdateShooter(bool is_right_bumper) {
-    intake.writeMicroseconds(is_right_bumper ? 2000 : MOTOR_OFF);
-}
-
-// shooter init function
-void InitShooter(int left_PWM, int right_PWM) {
-    shooter_left.attach(left_PWM);
-    shooter_right.attach(right_PWM);
-}
-
-// updates state of intake motors
-void UpdateIntake(bool is_left_bumper, bool is_right_bumper) {
-  if (is_left_bumper ^ is_right_bumper) {
-    if (is_left_bumper) {
-      intake.writeMicroseconds(1000);
-    }
-    else if(is_right_bumper) {
-      intake.writeMicroseconds(2000);
-    }
-  }
-  else {
-    intake.writeMicroseconds(MOTOR_OFF);
-  }
-}
-
-// intake init function
-void InitIntake(int PWM) {
-    intake.attach(PWM);
-}
-
-// updates state of linear actuators
-void UpdateLinearActuators(bool A, bool B, bool X, bool Y) {
-    digitalWrite(LIN_A_PIN, A ? HIGH : LOW);
-    digitalWrite(LIN_B_PIN, B ? HIGH : LOW);
-    digitalWrite(is_lin_x_PIN, X ? HIGH : LOW);
-    digitalWrite(LIN_Y_PIN, Y ? HIGH : LOW);
-}
-
-// linear actuator init function
-void InitLinearActuators(int A, int B, int X, int Y) {
-    pinMode(A, OUTPUT);
-    pinMode(B, OUTPUT);
-    pinMode(X, OUTPUT);
-    pinMode(Y, OUTPUT);
 }
